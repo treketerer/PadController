@@ -6,6 +6,7 @@ export interface PadConfig {
   label: string;
   key: string;
   soundfont: string;
+  isClean: boolean;
   isStop: boolean;
 }
 
@@ -14,64 +15,77 @@ const STORAGE_SOUNDFONTS_KEY = 'ambient_pad_server_soundfonts';
 const STORAGE_VOLUME_KEY = 'ambient_pad_server_volume';
 const STORAGE_CUSTOM_COLOR_KEY = 'ambient_pad_server_custom_color';
 
-// 24 музыкальные тональности (12 мажоров и 12 миноров)
-const TONALITIES_MAJOR = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
-const TONALITIES_MINOR = ['Cm', 'C#m', 'Dm', 'Ebm', 'Em', 'Fm', 'F#m', 'Gm', 'Abm', 'Am', 'Bbm', 'Bm'];
-
-const DEFAULT_SOUNDFONTS = [
-  'Warm_Ambient.sf2',
-  'Lush_Strings.sf2',
-  'Celestial_Choir.sf2',
-  'Soft_Air_Pad.sf2'
-];
-
-const DEFAULT_PADS: PadConfig[] = [
-  { id: 1, label: 'C', key: 'C', soundfont: 'Warm_Ambient.sf2', isStop: false },
-  { id: 2, label: 'D', key: 'D', soundfont: 'Warm_Ambient.sf2', isStop: false },
-  { id: 3, label: 'E', key: 'E', soundfont: 'Warm_Ambient.sf2', isStop: false },
-  { id: 4, label: 'F', key: 'F', soundfont: 'Warm_Ambient.sf2', isStop: false },
-  { id: 5, label: 'G', key: 'G', soundfont: 'Warm_Ambient.sf2', isStop: false },
-  { id: 6, label: 'A', key: 'A', soundfont: 'Warm_Ambient.sf2', isStop: false },
-  { id: 7, label: 'B', key: 'B', soundfont: 'Warm_Ambient.sf2', isStop: false },
-  { id: 8, label: 'C#', key: 'C#', soundfont: 'Warm_Ambient.sf2', isStop: false },
-  { id: 9, label: 'Eb', key: 'Eb', soundfont: 'Warm_Ambient.sf2', isStop: false },
-  { id: 10, label: 'F#', key: 'F#', soundfont: 'Warm_Ambient.sf2', isStop: false },
-  { id: 11, label: 'Ab', key: 'Ab', soundfont: 'Warm_Ambient.sf2', isStop: false },
-  { id: 12, label: 'Bb', key: 'Bb', soundfont: 'Warm_Ambient.sf2', isStop: false },
-  { id: 13, label: 'Am', key: 'Am', soundfont: 'Warm_Ambient.sf2', isStop: false },
-  { id: 14, label: 'Em', key: 'Em', soundfont: 'Warm_Ambient.sf2', isStop: false },
-  { id: 15, label: 'Dm', key: 'Dm', soundfont: 'Warm_Ambient.sf2', isStop: false },
-  { id: 16, label: 'СТОП', key: '', soundfont: 'Warm_Ambient.sf2', isStop: true },
-];
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function App() {
-  const [pads, setPads] = useState<PadConfig[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_PADS_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length === 16) {
-          // Гарантируем, что у всех пэдов есть валидный саундфонт
-          return parsed.map(p => ({
-            ...p,
-            soundfont: p.soundfont?.trim() ? p.soundfont : 'Warm_Ambient.sf2',
-          }));
-        }
-      }
-    } catch (_) {}
-    return DEFAULT_PADS;
-  });
 
-  const [soundfonts, setSoundfonts] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_SOUNDFONTS_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (_) {}
-    return DEFAULT_SOUNDFONTS;
-  });
+    const [pads, setPads] = useState<PadConfig[]>([]);
+
+    const fetchPadsCfg = async () => {
+            try {
+                const response = await fetch(`${API_URL}/config/`);
+
+                if (!response.ok){
+                    throw new Error("Не удалось получить настройки для pads_config");
+                }
+
+                const data: PadConfig[] = await response.json();
+                if (data.length === 16){
+                    setPads(data);
+                } else{
+                    throw new Error("Не удалось получить настройки для pads_config");
+                }
+            } catch (error) {
+                console.error("Ошибка загрузки конфигурации пэдов:", error);
+            }
+        };
+
+    useEffect(() => {
+        fetchPadsCfg();
+    }, []);
+
+    const [soundfonts, setSoundfonts] = useState<string[]>([]);
+
+    const fetchSoundfonts = async () => {
+            try {
+                const response = await fetch(`${API_URL}/soundfonts`);
+
+                if (!response.ok){
+                    throw new Error("Не удалось получить soundfonts");
+                }
+
+                let data: string[] = await response.json();
+                setSoundfonts(data);
+            } catch (_) {
+                throw new Error("Не удалось получить soundfonts");
+                return;
+            }
+        };
+
+    useEffect(() => {
+        fetchSoundfonts();
+    }, []);
+
+    const [tonalities, setTonalities] = useState<string[]>([]);
+
+    useEffect(() => {
+        const fetchTonalities = async () => {
+            try {
+                const response = await fetch(`${API_URL}/tonalities`);
+
+                if (!response.ok){
+                    throw new Error("Не удалось получить тональности");
+                }
+
+                let data: string[] = await response.json();
+                setTonalities(data);
+            } catch (_) {
+                throw new Error("Не удалось получить тональности");
+                return;
+            }
+        };
+        fetchTonalities();
+    }, []);
 
   // Ручная настройка цвета подсветки (HEX)
   const [customColor, setCustomColor] = useState<string>(() => {
@@ -94,10 +108,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE_PADS_KEY, JSON.stringify(pads));
   }, [pads]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_SOUNDFONTS_KEY, JSON.stringify(soundfonts));
-  }, [soundfonts]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_VOLUME_KEY, volume.toString());
@@ -137,6 +147,8 @@ export default function App() {
   const handlePadPress = (pad: PadConfig) => {
     if (pad.isStop) {
       setActivePadId(null);
+    } else if (pad.isClean) {
+      return;
     } else {
       setActivePadId(pad.id === activePadId ? null : pad.id);
     }
@@ -147,9 +159,10 @@ export default function App() {
     setPads(prev =>
       prev.map(p => {
         if (p.id === selectedPadId) {
-          const sf = p.soundfont?.trim() ? p.soundfont : (soundfonts[0] || 'Warm_Ambient.sf2');
+          const sf = p.soundfont?.trim() ? p.soundfont : (soundfonts[0] || '.sf2');
           return {
             ...p,
+            isClean: false,
             isStop: false,
             key: keyName,
             label: keyName,
@@ -168,10 +181,29 @@ export default function App() {
         if (p.id === selectedPadId) {
           return {
             ...p,
+            isClean: false,
             isStop: true,
             key: '',
             label: 'СТОП',
-            soundfont: p.soundfont?.trim() ? p.soundfont : (soundfonts[0] || 'Warm_Ambient.sf2'),
+            soundfont: p.soundfont?.trim() ? p.soundfont : (soundfonts[0] || '.sf2'),
+          };
+        }
+        return p;
+      })
+    );
+  };
+
+  const  handleSetCleanMode = () => {
+    setPads(prev =>
+      prev.map(p => {
+        if (p.id === selectedPadId) {
+          return {
+            ...p,
+            isClean: true,
+            isStop: false,
+            key: '',
+            label: '',
+            soundfont: '',
           };
         }
         return p;
@@ -188,7 +220,7 @@ export default function App() {
 
   // Применить саундфонт ко всем пэдам
   const handleApplySoundfontToAll = (sf: string) => {
-    setPads(prev => prev.map(p => (p.isStop ? p : { ...p, soundfont: sf })));
+    setPads(prev => prev.map(p => (p.isStop || p.isClean ? p : { ...p, soundfont: sf })));
   };
 
   // Добавить саундфонт в библиотеку
@@ -203,12 +235,78 @@ export default function App() {
     setNewSoundfontInput('');
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    Array.from(files).forEach(f => handleAddSoundfont(f.name));
-    e.target.value = '';
-  };
+    const handleSaveConfig = async (filename: string) => {
+        try {
+            const response = await fetch(`${API_URL}/config`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(pads)
+            });
+
+            if (!response.ok) {
+                throw new Error("Не удалось удалить файл");
+            }
+
+            await fetchPadsCfg();
+            await fetchSoundfonts();
+
+        } catch (error) {
+            console.error("Ошибка удаления SoundFont:", error);
+        }
+    };
+
+    const handleDeleteSoundfont = async (filename: string) => {
+        try {
+            const response = await fetch(
+                `${API_URL}/soundfonts/${encodeURIComponent(filename)}`,
+                { method: "DELETE" }
+            );
+
+            if (!response.ok) {
+                throw new Error("Не удалось удалить файл");
+            }
+
+            await fetchPadsCfg();
+            await fetchSoundfonts();
+
+        } catch (error) {
+            console.error("Ошибка удаления SoundFont:", error);
+        }
+    };
+
+    const handleFileUpload = async (
+        event: React.ChangeEvent<HTMLInputElement>
+    ) => {
+        const files = event.target.files;
+
+        if (!files || files.length === 0) return;
+
+        try {
+            for (const file of Array.from(files)) {
+                const formData = new FormData();
+                formData.append("file", file);
+
+                const response = await fetch(`${API_URL}/soundfonts/`, {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Ошибка загрузки: ${file.name}`);
+                }
+            }
+
+            await fetchPadsCfg();
+            await fetchSoundfonts();
+
+        } catch (error) {
+            console.error("Ошибка загрузки SoundFont:", error);
+        } finally {
+            event.target.value = "";
+        }
+    };
 
   const currentPad = pads.find(p => p.id === selectedPadId) || pads[0];
   const knobAngle = -135 + (volume / 100) * 270;
@@ -315,7 +413,7 @@ export default function App() {
                   <div className="my-auto text-center w-full">
                     <span
                       className={`block font-extrabold leading-none tracking-tight ${
-                        pad.isStop
+                        (pad.isStop || pad.isClean)
                           ? 'text-rose-400 text-base sm:text-2xl md:text-3xl'
                           : isActive
                             ? 'text-white text-lg sm:text-2xl md:text-3xl lg:text-4xl'
@@ -329,7 +427,7 @@ export default function App() {
                   {/* Нижняя надпись саундфонта */}
                   <div className="w-full truncate text-[8px] sm:text-[10px] font-mono border-t border-white/[0.04] pt-0.5">
                     <span className="text-neutral-500">
-                      {pad.isStop ? 'СТОП' : (pad.soundfont ? pad.soundfont.replace('.sf2', '') : '—')}
+                      {pad.isClean ? '—' : (pad.isStop) ? 'СТОП' : (pad.soundfont ? pad.soundfont.replace('.sf2', '') : '—')}
                     </span>
                   </div>
                 </button>
@@ -435,87 +533,94 @@ export default function App() {
                     <span className="font-bold text-white">Кнопка #{currentPad.id}</span>
                     <span className="font-mono text-neutral-300">{currentPad.label}</span>
                   </div>
+                  
+                  <div className="p-1 bg-[#13151f] flex items-center justify-between gap-2">
+                    {/* Очистка кнопки от тональности */}
+                    <button
+                      onClick={handleSetCleanMode}
+                      className={`w-full py-1.5 rounded border text-xs font-semibold transition-colors ${
+                        currentPad.isClean
+                          ? 'bg-rose-950/70 text-rose-300 border-rose-500'
+                          : 'bg-[#0f1118] text-neutral-400 border-[#202332] hover:text-neutral-200'
+                      }`}
+                    >
+                      Пустая кнопка
+                    </button>
 
-                  {/* Режим кнопки СТОП */}
-                  <button
-                    onClick={handleSetStopMode}
-                    className={`w-full py-1.5 rounded border text-xs font-semibold transition-colors ${
-                      currentPad.isStop
-                        ? 'bg-rose-950/70 text-rose-300 border-rose-500'
-                        : 'bg-[#0f1118] text-neutral-400 border-[#202332] hover:text-neutral-200'
-                    }`}
-                  >
-                    Сделать кнопкой СТОП
-                  </button>
+                    {/* Режим кнопки СТОП */}
+                    <button
+                      onClick={handleSetStopMode}
+                      className={`w-full py-1.5 rounded border text-xs font-semibold transition-colors ${
+                        currentPad.isStop
+                          ? 'bg-rose-950/70 text-rose-300 border-rose-500'
+                          : 'bg-[#0f1118] text-neutral-400 border-[#202332] hover:text-neutral-200'
+                      }`}
+                    >
+                      Сделать кнопкой СТОП
+                    </button>
+                  </div>
 
                   {/* 24 Тональности */}
                   <div>
                     <span className="block text-[11px] text-neutral-400 mb-1">
-                      Мажорные тональности (12):
+                      Тональности:
                     </span>
+                    
                     <div className="grid grid-cols-6 gap-1 mb-2">
-                      {TONALITIES_MAJOR.map((note) => (
-                        <button
-                          key={note}
-                          onClick={() => handleSelectTonality(note)}
-                          className="py-1 rounded border text-xs font-medium transition-colors"
-                          style={{
-                            backgroundColor: !currentPad.isStop && currentPad.key === note ? customColor : '#0e1017',
-                            borderColor: !currentPad.isStop && currentPad.key === note ? customColor : '#202332',
-                            color: !currentPad.isStop && currentPad.key === note ? '#ffffff' : '#d1d5db',
-                            fontWeight: !currentPad.isStop && currentPad.key === note ? 700 : 400,
-                          }}
-                        >
-                          {note}
-                        </button>
-                      ))}
-                    </div>
-
-                    <span className="block text-[11px] text-neutral-400 mb-1">
-                      Минорные тональности (12):
-                    </span>
-                    <div className="grid grid-cols-6 gap-1">
-                      {TONALITIES_MINOR.map((note) => (
-                        <button
-                          key={note}
-                          onClick={() => handleSelectTonality(note)}
-                          className="py-1 rounded border text-xs font-medium transition-colors"
-                          style={{
-                            backgroundColor: !currentPad.isStop && currentPad.key === note ? customColor : '#0e1017',
-                            borderColor: !currentPad.isStop && currentPad.key === note ? customColor : '#202332',
-                            color: !currentPad.isStop && currentPad.key === note ? '#ffffff' : '#d1d5db',
-                            fontWeight: !currentPad.isStop && currentPad.key === note ? 700 : 400,
-                          }}
-                        >
-                          {note}
-                        </button>
-                      ))}
+                      {(tonalities.length > 0) ? (
+                        tonalities.map((note) => (
+                          <button
+                            key={note}
+                            onClick={() => handleSelectTonality(note)}
+                            className="py-1 rounded border text-xs font-medium transition-colors"
+                            style={{
+                              backgroundColor: !currentPad.isStop && currentPad.key === note ? customColor : '#0e1017',
+                              borderColor: !currentPad.isStop && currentPad.key === note ? customColor : '#202332',
+                              color: !currentPad.isStop && currentPad.key === note ? '#ffffff' : '#d1d5db',
+                              fontWeight: !currentPad.isStop && currentPad.key === note ? 700 : 400,
+                            }}
+                          >
+                            {note}
+                          </button>
+                        ))
+                      ) : (
+                        <span className="col-span-6 block font-semibold text-neutral-300 mb-1.5">
+                          Библиотека тональностей пуста!!!
+                        </span>
+                      )}
                     </div>
                   </div>
 
                   {/* Назначенный саундфонт */}
-                  {!currentPad.isStop && (
+                  {(!currentPad.isStop && !currentPad.isClean) && (
                     <div className="pt-2 border-t border-[#212432]">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-neutral-400">Саундфонт кнопки:</span>
                         <button
                           onClick={() => handleApplySoundfontToAll(currentPad.soundfont)}
                           className="text-[11px] text-neutral-400 hover:text-white underline"
-                        >
+                        > 
                           Ко всем 16
-                        </button>
+                        </button> 
                       </div>
-                      <select
-                        value={currentPad.soundfont || soundfonts[0] || ''}
-                        onChange={(e) => handleSetPadSoundfont(e.target.value)}
-                        className="w-full bg-[#0c0d13] border border-[#242738] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none"
-                      >
-                        {soundfonts.map((sf) => (
-                          <option key={sf} value={sf}>
-                            {sf}
-                          </option>
-                        ))}
-                      </select>
+
+                      {soundfonts.length > 1 ? (
+                        <select
+                          value={currentPad.soundfont || soundfonts[0] || ''}
+                          onChange={(e) => handleSetPadSoundfont(e.target.value)}
+                          className="w-full bg-[#0c0d13] border border-[#242738] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none"
+                        >
+                          {soundfonts.map((sf) => (
+                            <option key={sf} value={sf}>
+                              {sf}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-s text-gray-400 font-mono">
+                          {soundfonts.length === 1 ? soundfonts[0] : "Библиотека soundfont пуста!!!"}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -545,32 +650,6 @@ export default function App() {
                   </label>
                 </div>
 
-                {/* Добавить вручную */}
-                <div className="bg-[#141620] border border-[#202330] rounded-xl p-3.5 space-y-2">
-                  <span className="block font-semibold text-neutral-300">
-                    Или добавить по имени:
-                  </span>
-                  <div className="flex gap-1.5">
-                    <input
-                      type="text"
-                      value={newSoundfontInput}
-                      onChange={(e) => setNewSoundfontInput(e.target.value)}
-                      placeholder="MySoundfont.sf2"
-                      className="flex-1 bg-[#0c0d13] border border-[#232636] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleAddSoundfont(newSoundfontInput);
-                      }}
-                    />
-                    <button
-                      onClick={() => handleAddSoundfont(newSoundfontInput)}
-                      className="px-3 py-1.5 bg-[#202332] hover:bg-[#2a2e40] text-white rounded text-xs font-medium transition-colors flex items-center gap-1"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Добавить</span>
-                    </button>
-                  </div>
-                </div>
-
                 {/* Список загруженных саундфонтов */}
                 <div className="bg-[#141620] border border-[#202330] rounded-xl p-3.5 space-y-2">
                   <div className="flex items-center justify-between pb-1.5 border-b border-[#212432]">
@@ -594,15 +673,14 @@ export default function App() {
                           >
                             Ко всем
                           </button>
-                          {soundfonts.length > 1 && (
                             <button
-                              onClick={() => setSoundfonts(prev => prev.filter(s => s !== sf))}
-                              className="text-neutral-500 hover:text-rose-400 p-0.5"
-                              title="Удалить"
+                                onClick={() => handleDeleteSoundfont(sf)}
+                                className="text-neutral-500 hover:text-rose-400 p-0.5"
+                                title="Удалить"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-3.5 h-3.5" />
                             </button>
-                          )}
+                          
                         </div>
                       </div>
                     ))}
@@ -624,10 +702,10 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
-                  localStorage.setItem(STORAGE_PADS_KEY, JSON.stringify(pads));
-                  localStorage.setItem(STORAGE_SOUNDFONTS_KEY, JSON.stringify(soundfonts));
-                  localStorage.setItem(STORAGE_CUSTOM_COLOR_KEY, customColor);
-                  setIsSettingsOpen(false);
+                    handleSaveConfig()
+                    localStorage.setItem(STORAGE_PADS_KEY, JSON.stringify(pads));
+                    localStorage.setItem(STORAGE_CUSTOM_COLOR_KEY, customColor);
+                    setIsSettingsOpen(false);
                 }}
                 className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold text-white transition-opacity hover:opacity-90 active:scale-95"
                 style={{ backgroundColor: customColor }}
