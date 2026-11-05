@@ -1,0 +1,25 @@
+# Байт-код, оптимизированные и DLL-файлы
+__pycache__/
+*.py[cod]
+
+# Файлы конфигурации для venv
+venv/
+.venv
+/.venv/
+
+# Файлы кэши
+.coverage
+*.py,cover
+.cache/
+.idea/
+/.idea/
+
+# NODEJS IGNORE
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
