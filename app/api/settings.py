@@ -36,12 +36,14 @@ async def get_config():
     logger.info(state.volume)
     if not os.path.isfile(CONFIG_PATH):
         return {
+            "active_pad": state.active_pad,
             "volume": state.volume,
             "pads": BASE_PADS_CONFIG
         }
 
     with open(CONFIG_PATH, 'r', encoding='utf-8') as file:
         return {
+            "active_pad": state.active_pad,
             "volume": state.volume,
             "pads": json.load(file)
         }

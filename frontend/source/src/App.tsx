@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Settings, X, Upload, Plus, Trash2, Save } from 'lucide-react';
 import { Toaster, toast } from "sonner";
+import { socketService } from "./sockets";
 
 export interface PadConfig {
   id: number;
@@ -12,23 +13,34 @@ export interface PadConfig {
   isStop: boolean;
 }
 
+export interface ControlsConfig{
+  active_pad: number,
+  volume: number,
+  pads: PadConfig[]
+}
+
 const STORAGE_CUSTOM_COLOR_KEY = 'ambient_pad_server_custom_color';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 export default function App() {
 
+    useEffect(() => {
+        socketService.connect();
+    }, []);
+
     const [pads, setPads] = useState<PadConfig[]>([]);
 
     const fetchPadsCfg = async () => {
             try {
-                const response = await fetch(`${API_URL}/config/`);
+                const response = await fetch(`${API_URL}/config`);
 
                 if (!response.ok){
                     throw new Error("Не удалось получить настройки для pads_config");
                 }
-
-                const data: PadConfig[] = await response.json();
+                
+                const data: ControlsConfig = await response.json();
+                console.log(data)
                 const pads = data.pads
                 if (pads.length === 16){
                     setPads(pads);
@@ -43,6 +55,14 @@ export default function App() {
                 } else{
                     toast.error("Не удалось получить настройки громкости");
                     throw new Error("Не удалось получить настройки громкости");
+                }
+
+                const active_pad_id = data.active_pad
+                if (active_pad_id && active_pad_id > 0 && active_pad_id < 17){
+                    setActivePadId(active_pad_id);
+                } else if (active_pad_id !== 0 && active_pad_id !== null){
+                    toast.error("Не удалось получить активный пэд");
+                    throw new Error("Не удалось получить активный пэд");
                 }
             } catch (error) {
                 toast.error("Не удалось получить настройки пэдов");
@@ -107,7 +127,7 @@ export default function App() {
   });
 
     // Крутилка громкости (0..100)
-    const [volume, setVolume] = useState<number>(85);
+    const [volume, setVolume] = useState<number>();
 
     const volumeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -122,13 +142,7 @@ export default function App() {
         // Отправляем только последнее значение
         volumeTimeout.current = setTimeout(async () => {
             try {
-                const response = await fetch(`${API_URL}/volume/${value}`, {
-                    method: "POST",
-                });
-
-                if (!response.ok) {
-                    throw new Error("Не удалось применить громкость пэдов");
-                }
+              socketService.send("volume_changed", {"value": value});
             } catch (error) {
                 console.error(error);
                 toast.error("Не удалось применить громкость пэдов");
@@ -141,7 +155,59 @@ export default function App() {
   const [settingsTab, setSettingsTab] = useState<'pads' | 'soundfonts'>('pads');
   const [selectedPadId, setSelectedPadId] = useState<number>(1);
   const [newSoundfontInput, setNewSoundfontInput] = useState('');
+  
 
+  
+    // Регистрация сокет хендлеров 
+    useEffect(() => {
+        const handleVolumeChanged = (data: any) => {
+            console.log(data)
+            setVolume(data.value);
+        };
+
+        socketService.on("volume_changed", handleVolumeChanged);
+
+        return () => {
+            socketService.off("volume_changed");
+        };
+    }, []);
+
+    useEffect(() => {
+        const handleClickPad = (data: any) => {
+          const active_pad_id = data.active_pad;
+
+          if ((active_pad_id > 0 && active_pad_id < 17) || (active_pad_id === null)){
+            setActivePadId(active_pad_id)
+          }
+        };
+        
+        socketService.on("pad_click", handleClickPad);
+
+        return () => {
+            socketService.off("pad_click");
+        };
+    }, [pads, activePadId]);
+
+    useEffect(() => {
+        const handleGlobalSettingsOpen = (data: any) => {
+            toast.warning("Кто-то открыл настройки, возможны конфликты конфигурации!");
+        };
+
+        const handleGlobalNewSettings = async (data: any) => {
+            toast.warning("Кто-то обновил настройки пэдов, загружаем новые настройки!");
+            await fetchPadsCfg();
+            await fetchSoundfonts();
+        };
+
+        socketService.on("open_settings", handleGlobalSettingsOpen);
+        socketService.on("settings_saved", handleGlobalNewSettings);
+
+        return () => {
+            socketService.off("open_settings");
+            socketService.off("settings_saved");
+        };
+    }, []);
+    
   useEffect(() => {
     localStorage.setItem(STORAGE_CUSTOM_COLOR_KEY, customColor);
   }, [customColor]);
@@ -173,20 +239,33 @@ export default function App() {
     } catch (_) {}
   };
 
+  const [stopPadId, setStopPadId] = useState<number | null>(null);
+
   // Клик по плитке
-  const handlePadPress = (pad: PadConfig) => {
-    if (pad.isStop) {
-      setActivePadId(null);
-    } else if (pad.isClean) {
+  const handlePadPress = (pad: PadConfig, need_send_click = true) => {
+    console.log(pad)
+
+    if (pad.isClean) {
       return;
-    } else {
-        console.log(pad)
-        if (pad.soundfont !== "" && pad.key !== ""){
-            setActivePadId(pad.id === activePadId ? null : pad.id);
-        } else{
-            toast.warning("Выбран пэд без выбранного звука или тональности. Проверьте настройки!")
-        }
-    }
+    } else if (pad.isStop) {
+      setActivePadId(null);
+      setStopPadId(pad.id);
+      setTimeout(() => setStopPadId(null), 400);
+
+      if (need_send_click){
+        socketService.send("pad_click", {"active_pad": null});
+      }
+    } else if (pad.soundfont === "" || pad.key === ""){
+      toast.warning("Выбран пэд без указания набора звуков или тональности. Проверьте настройки");
+      return;
+    }  else {
+      const active = pad.id === activePadId ? null : pad.id
+      setActivePadId(active);
+
+      if (need_send_click){
+        socketService.send("pad_click", {"active_pad": active});
+      }
+    }  
   };
 
   // Выбор тональности из 24 вариантов (автоматически ставит подпись и подтягивает саундфонт)
@@ -274,7 +353,7 @@ export default function App() {
     setNewSoundfontInput('');
   };
 
-    const handleSaveConfig = async (filename: string) => {
+    const handleSaveConfig = async () => {
         try {
             console.log(JSON.stringify(pads))
             const response = await fetch(`${API_URL}/config`, {
@@ -286,10 +365,11 @@ export default function App() {
             });
 
             if (!response.ok) {
-                throw new Error("Не удалось сохранить настройки");
                 toast.error("Не удалось сохранить настройки");
+                throw new Error("Не удалось сохранить настройки");
             }
-
+            
+            socketService.send("settings_saved", {})
             await fetchPadsCfg();
             await fetchSoundfonts();
             toast.success("Конфигурация сохранена");
@@ -308,12 +388,13 @@ export default function App() {
             );
 
             if (!response.ok) {
-                throw new Error("Не удалось удалить файл");
-                toast.error("Не удалось удалить файл");
+              toast.error("Не удалось удалить файл");
+              throw new Error("Не удалось удалить файл");
             }
-
+            
             await fetchPadsCfg();
             await fetchSoundfonts();
+            socketService.send("settings_saved", {})
 
         } catch (error) {
             console.error("Ошибка удаления SoundFont:", error);
@@ -393,7 +474,11 @@ export default function App() {
         </div>
 
         <button
-          onClick={() => setIsSettingsOpen(true)}
+          onClick={() => {
+              socketService.send("open_settings", {})
+              setIsSettingsOpen(true);
+            }
+          }
           className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-[#151722] hover:bg-[#1e202e] text-neutral-300 hover:text-white border border-[#232636] rounded-md text-xs font-medium transition-colors shrink-0"
         >
           <Settings className="w-3.5 h-3.5" />
@@ -446,7 +531,9 @@ export default function App() {
                         ? '#261215'
                         : `${customColor}24`
                       : '#13151e',
-                    border: isActive
+                    border: stopPadId === pad.id
+                      ? '2px solid #f43f5e'
+                      : isActive
                       ? `2px solid ${pad.isStop ? '#f43f5e' : customColor}`
                       : '1px solid #1f2230',
                   }}
@@ -525,7 +612,10 @@ export default function App() {
               </div>
 
               <button
-                onClick={() => setIsSettingsOpen(false)}
+                onClick={() => {
+                    setIsSettingsOpen(false);
+                  }
+                }
                 className="p-1.5 rounded text-neutral-400 hover:text-white hover:bg-[#1a1d28] transition-colors"
               >
                 <X className="w-4 h-4" />
