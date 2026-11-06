@@ -5,7 +5,7 @@ import os
 from fastapi import UploadFile, HTTPException, status, APIRouter
 from pathlib import Path
 
-from app.api.settings import CONFIG_PATH
+from app.config import PADS_CONFIG_PATH
 from app.schemas.pads_config import PadConfig
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ async def create_soundfont(file: UploadFile):
             detail="Передан файл неверного типа"
         )
 
-    file_path = UPLOAD_DIR/file.filename
+    file_path = UPLOAD_DIR / filename
     if os.path.isfile(file_path):
         raise HTTPException(
             status_code=409,
@@ -82,7 +82,7 @@ async def delete_soundfont(filename: str):
     try:
         try:
             pads = [PadConfig.model_validate(item) for item in json.loads(
-                open(CONFIG_PATH, encoding="utf-8").read()
+                open(PADS_CONFIG_PATH, encoding="utf-8").read()
             )]
 
             for pad in pads:
@@ -90,7 +90,7 @@ async def delete_soundfont(filename: str):
                 if pad.soundfont == filename:
                     pad.soundfont = ""
 
-            with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+            with open(PADS_CONFIG_PATH, 'w', encoding='utf-8') as f:
                 json.dump(
                     [pad.model_dump() for pad in pads],
                     f,

@@ -5,6 +5,9 @@ class PadConfig(BaseModel):
     label: str
     key: str
     soundfont: str
+
     type: int
+    octave: int
+
     isClean: bool
     isStop: bool

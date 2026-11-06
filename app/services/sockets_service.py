@@ -1,6 +1,6 @@
 from fastapi import WebSocket
 
-class SocketsManager:
+class SocketsService:
     def __init__(self):
         self.conn_storage: dict[str, WebSocket] = {}
 

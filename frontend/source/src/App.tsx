@@ -8,7 +8,10 @@ export interface PadConfig {
   label: string;
   key: string;
   soundfont: string;
+
   type: number;
+  octave:  number;
+
   isClean: boolean;
   isStop: boolean;
 }
@@ -127,7 +130,7 @@ export default function App() {
   });
 
     // Крутилка громкости (0..100)
-    const [volume, setVolume] = useState<number>();
+    const [volume, setVolume] = useState<number>(85);
 
     const volumeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -154,9 +157,6 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'pads' | 'soundfonts'>('pads');
   const [selectedPadId, setSelectedPadId] = useState<number>(1);
-  const [newSoundfontInput, setNewSoundfontInput] = useState('');
-  
-
   
     // Регистрация сокет хендлеров 
     useEffect(() => {
@@ -207,6 +207,18 @@ export default function App() {
             socketService.off("settings_saved");
         };
     }, []);
+
+    useEffect(() => {
+        const handleSocketError = (data: any) => {
+            toast.error("Ошибка при совершении сетевого действия!" + data.message);
+        };
+
+        socketService.on("error", handleSocketError);
+
+        return () => {
+            socketService.off("error");
+        };
+    }, []);
     
   useEffect(() => {
     localStorage.setItem(STORAGE_CUSTOM_COLOR_KEY, customColor);
@@ -250,7 +262,7 @@ export default function App() {
     } else if (pad.isStop) {
       setActivePadId(null);
       setStopPadId(pad.id);
-      setTimeout(() => setStopPadId(null), 400);
+      setTimeout(() => setStopPadId(null), 175);
 
       if (need_send_click){
         socketService.send("pad_click", {"active_pad": null});
@@ -280,8 +292,9 @@ export default function App() {
             isStop: false,
             key: keyName,
             label: keyName,
-            soundfont: sf,
             type: 0,
+            octave: 0,
+            soundfont: sf,
           };
         }
         return p;
@@ -300,8 +313,11 @@ export default function App() {
             isStop: true,
             key: '',
             label: 'СТОП',
-            soundfont: p.soundfont?.trim() ? p.soundfont : (soundfonts[0] || '.sf2'),
+
             type: 0,
+            octave: 0,
+
+            soundfont: p.soundfont?.trim() ? p.soundfont : (soundfonts[0] || '.sf2'),
           };
         }
         return p;
@@ -319,14 +335,27 @@ export default function App() {
             isStop: false,
             key: '',
             label: '',
-            soundfont: '',
             type: 0,
+            octave: 0,
+            soundfont: '',
           };
         }
         return p;
       })
     );
   };
+
+  const handleSetPadType = (type: number) => {
+    setPads(prev =>
+      prev.map(p => (p.id === selectedPadId ? { ...p, type: type } : p))
+    );
+  }
+
+  const handleSetPadOctave = (octave: number) => {
+    setPads(prev =>
+      prev.map(p => (p.id === selectedPadId ? { ...p, octave: octave } : p))
+    );
+  }
 
   // Смена саундфонта у пэда
   const handleSetPadSoundfont = (sf: string) => {
@@ -337,104 +366,100 @@ export default function App() {
 
   // Применить саундфонт ко всем пэдам
   const handleApplySoundfontToAll = (sf: string) => {
-    setPads(prev => prev.map(p => (p.isStop || p.isClean ? p : { ...p, soundfont: sf })));
-    handleSaveConfig();
+    const updatedPads = pads.map(p =>
+      p.isStop || p.isClean ? p : { ...p, soundfont: sf }
+    );
+
+    setPads(updatedPads);
+    handleSaveConfig(updatedPads);
   };
 
-  // Добавить саундфонт в библиотеку
-  const handleAddSoundfont = (name: string) => {
-    const clean = name.trim();
-    if (!clean) return;
-    const finalName = clean.endsWith('.sf2') ? clean : `${clean}.sf2`;
-    if (!soundfonts.includes(finalName)) {
-      setSoundfonts(prev => [...prev, finalName]);
-    }
-    handleSetPadSoundfont(finalName);
-    setNewSoundfontInput('');
+  const handleSaveConfig = async (custom_pads: PadConfig[] | undefined = undefined) => {
+      try {
+          const set_pads = custom_pads ? custom_pads : pads;
+
+          console.log(JSON.stringify(set_pads))
+          const response = await fetch(`${API_URL}/config`, {
+              method: "POST",
+              headers: {
+                  "Content-Type": "application/json"
+              },
+              body: JSON.stringify(set_pads)
+          });
+
+          if (!response.ok) {
+              toast.error("Не удалось сохранить настройки");
+              throw new Error("Не удалось сохранить настройки");
+          }
+          
+          socketService.send("settings_saved", {})
+          await fetchPadsCfg();
+          await fetchSoundfonts();
+          toast.success("Конфигурация сохранена");
+
+      } catch (error) {
+          console.error("Не удалось сохранить настройки:", error);
+          toast.error("Не удалось сохранить настройки");
+      }
   };
 
-    const handleSaveConfig = async () => {
-        try {
-            console.log(JSON.stringify(pads))
-            const response = await fetch(`${API_URL}/config`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(pads)
-            });
+  const handleDeleteSoundfont = async (filename: string) => {
+      try {
+          const response = await fetch(
+              `${API_URL}/soundfonts/${encodeURIComponent(filename)}`,
+              { method: "DELETE" }
+          );
 
-            if (!response.ok) {
-                toast.error("Не удалось сохранить настройки");
-                throw new Error("Не удалось сохранить настройки");
-            }
-            
-            socketService.send("settings_saved", {})
-            await fetchPadsCfg();
-            await fetchSoundfonts();
-            toast.success("Конфигурация сохранена");
+          if (!response.ok) {
+            toast.error("Не удалось удалить файл");
+            throw new Error("Не удалось удалить файл");
+          }
+          
+          await fetchPadsCfg();
+          await fetchSoundfonts();
+          socketService.send("settings_saved", {})
 
-        } catch (error) {
-            console.error("Не удалось сохранить настройки:", error);
-            toast.error("Не удалось сохранить настройки");
-        }
-    };
+      } catch (error) {
+          console.error("Ошибка удаления SoundFont:", error);
+      }
+  };
 
-    const handleDeleteSoundfont = async (filename: string) => {
-        try {
-            const response = await fetch(
-                `${API_URL}/soundfonts/${encodeURIComponent(filename)}`,
-                { method: "DELETE" }
-            );
+  const handleFileUpload = async (
+      event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+      const files = event.target.files;
 
-            if (!response.ok) {
-              toast.error("Не удалось удалить файл");
-              throw new Error("Не удалось удалить файл");
-            }
-            
-            await fetchPadsCfg();
-            await fetchSoundfonts();
-            socketService.send("settings_saved", {})
+      if (!files || files.length === 0) return;
 
-        } catch (error) {
-            console.error("Ошибка удаления SoundFont:", error);
-        }
-    };
+      try {
+          for (const file of Array.from(files)) {
+              const formData = new FormData();
+              formData.append("file", file);
 
-    const handleFileUpload = async (
-        event: React.ChangeEvent<HTMLInputElement>
-    ) => {
-        const files = event.target.files;
+              const response = await fetch(`${API_URL}/soundfonts/`, {
+                  method: "POST",
+                  body: formData
+              });
 
-        if (!files || files.length === 0) return;
+              if (!response.ok) {
+                  if (response.status == 409){
+                       toast.warning(`Файл ${file.name} не был отправлен, потому что уже есть на сервере.`);
+                  }
+                  console.log(`Ошибка загрузки: ${file.name} ${response.status}`);
+              } else{
+                  toast.success(`Файл ${file.name} был успешно загружен на сервер!`);
+              }
+          }
 
-        try {
-            for (const file of Array.from(files)) {
-                const formData = new FormData();
-                formData.append("file", file);
+          await fetchPadsCfg();
+          await fetchSoundfonts();
 
-                const response = await fetch(`${API_URL}/soundfonts/`, {
-                    method: "POST",
-                    body: formData
-                });
-
-                if (!response.ok) {
-                    if (response.status == 409){
-                        toast.error("Данный файл уже есть на сервере!")
-                    }
-                    throw new Error(`Ошибка загрузки: ${file.name}`);
-                }
-            }
-
-            await fetchPadsCfg();
-            await fetchSoundfonts();
-
-        } catch (error) {
-            console.error("Ошибка загрузки SoundFont:", error);
-        } finally {
-            event.target.value = "";
-        }
-    };
+      } catch (error) {
+          console.error("Ошибка загрузки SoundFont:", error);
+      } finally {
+          event.target.value = "";
+      }
+  };
 
   const currentPad = pads.find(p => p.id === selectedPadId) || pads[0];
   const knobAngle = -135 + (volume / 100) * 270;
@@ -679,10 +704,9 @@ export default function App() {
                 <div className="bg-[#141620] border border-[#202330] rounded-xl p-3.5 space-y-3">
                   <div className="flex items-center justify-between pb-2 border-b border-[#212432]">
                     <span className="font-bold text-white">Кнопка #{currentPad.id}</span>
-                    <span className="font-mono text-neutral-300">{currentPad.label}</span>
                   </div>
                   
-                  <div className="p-1 bg-[#13151f] flex items-center justify-between gap-2">
+                  <div className="bg-[#13151f] flex items-center justify-between gap-2">
                     {/* Очистка кнопки от тональности */}
                     <button
                       onClick={handleSetCleanMode}
@@ -738,10 +762,44 @@ export default function App() {
                       )}
                     </div>
                   </div>
+                    
+                  <div className="bg-[#141620] rounded-xl p-1 space-y-1">
+                    {!currentPad.isStop && !currentPad.isClean && (
+                      <div className="grid grid-cols-2 gap-3">
+
+                        <div>
+                          <span className="text-neutral-400 block mb-1">Тип пэда:</span>
+                          <select
+                            value={currentPad.type}
+                            onChange={(e) => handleSetPadType(Number(e.target.value))}
+                            className="w-full bg-[#0c0d13] border border-[#242738] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none"
+                          >
+                            <option value={1}>Тип 1</option>
+                            <option value={2}>Тип 2</option>
+                            <option value={3}>Тип 3</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <span className="text-neutral-400 block mb-1">Октава:</span>
+                          <input
+                            type="number"
+                            min={-10}
+                            max={10}
+                            step={1}
+                            value={currentPad.octave}
+                            onChange={(e) => handleSetPadOctave(Math.max(-10, Math.min(10, Number(e.target.value))))}
+                            className="w-full bg-[#0c0d13] border border-[#242738] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none"
+                          />
+                        </div>
+
+                      </div>
+                    )}
+                  </div>
 
                   {/* Назначенный саундфонт */}
                   {(!currentPad.isStop && !currentPad.isClean) && (
-                    <div className="pt-2 border-t border-[#212432]">
+                    <div className="p-1">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-neutral-400">Саундфонт кнопки:</span>
                         <button
@@ -773,23 +831,44 @@ export default function App() {
                       )}
                     </div>
                   )}
+
+
+
                 </div>
               </div>
             )}
 
             {/* Тело настроек: Подраздел 2 — Саундфонты (ОТДЕЛЬНЫЙ ПОДРАЗДЕЛ) */}
             {settingsTab === 'soundfonts' && (
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+              <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
                 {/* Отгрузка файла .sf2 */}
-                <div className="bg-[#141620] border border-[#202330] rounded-xl p-4 text-center">
-                  <label className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-[#292d3e] hover:border-neutral-500 rounded-lg cursor-pointer transition-colors">
-                    <Upload className="w-5 h-5 text-neutral-400 mb-1.5" />
+                <div className="bg-[#141620] border border-[#202330] rounded-xl p-3 text-center">
+                  <label
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+
+                      const files = e.dataTransfer.files;
+                      if (files.length > 0) {
+                        handleFileUpload({
+                          target: { files }
+                        } as React.ChangeEvent<HTMLInputElement>);
+                      }
+                    }}
+                    className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-[#292d3e] hover:border-neutral-500 rounded-lg cursor-pointer transition-colors"
+                  >
+                    <Upload className="w-5 h-11 text-neutral-400 mb-1.5" />
+
                     <span className="text-xs font-semibold text-neutral-200">
                       Отгрузить файл Soundfont (.sf2)
                     </span>
+
                     <span className="text-[10px] text-neutral-500 mt-0.5">
-                      Нажмите для выбора с устройства
+                      Нажмите для выбора с устройства или перетащите файл
                     </span>
+
                     <input
                       type="file"
                       accept=".sf2,.sf3,.dls"

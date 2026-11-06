@@ -3,19 +3,19 @@ import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from app.services.sockets_manager import SocketsManager
+from app.services.sockets_service import SocketsService
 from app.state import state
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-sockets_manager = SocketsManager()
+sockets_service = SocketsService()
 
 @router.websocket("/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
     await websocket.accept()
-    sockets_manager.add(user_id, websocket)
+    sockets_service.add(user_id, websocket)
     try:
         while True:
             sock_data = await websocket.receive_text()
@@ -40,7 +40,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
                 if active_pad:
                     state.active_pad = active_pad
 
-                await sockets_manager.send_except_author(
+                await sockets_service.send_except_author(
                     user_id, "pad_click", data
                 )
 
@@ -48,17 +48,17 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
                 volume = data.get("value")
                 if volume:
                     state.volume = volume
-                    await sockets_manager.send_except_author(
+                    await sockets_service.send_except_author(
                         user_id, "volume_changed", data
                     )
 
             elif event == "open_settings":
-                await sockets_manager.send_except_author(
+                await sockets_service.send_except_author(
                     user_id, "open_settings", {}
                 )
 
             elif event == "settings_saved":
-                await sockets_manager.send_except_author(
+                await sockets_service.send_except_author(
                     user_id, "settings_saved", {}
                 )
 
@@ -69,4 +69,4 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
                 })
 
     except WebSocketDisconnect:
-        sockets_manager.remove(user_id)
+        sockets_service.remove(user_id)
