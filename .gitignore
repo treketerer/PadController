@@ -24,3 +24,4 @@ coverage/
 .env*
 !.env.example
 *.sf2
+app/static/data.json

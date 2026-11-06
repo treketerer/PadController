@@ -1,18 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Settings, X, Upload, Plus, Trash2, Save } from 'lucide-react';
+import { Toaster, toast } from "sonner";
 
 export interface PadConfig {
   id: number;
   label: string;
   key: string;
   soundfont: string;
+  type: number;
   isClean: boolean;
   isStop: boolean;
 }
 
-const STORAGE_PADS_KEY = 'ambient_pad_server_pads';
-const STORAGE_SOUNDFONTS_KEY = 'ambient_pad_server_soundfonts';
-const STORAGE_VOLUME_KEY = 'ambient_pad_server_volume';
 const STORAGE_CUSTOM_COLOR_KEY = 'ambient_pad_server_custom_color';
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -30,12 +29,23 @@ export default function App() {
                 }
 
                 const data: PadConfig[] = await response.json();
-                if (data.length === 16){
-                    setPads(data);
+                const pads = data.pads
+                if (pads.length === 16){
+                    setPads(pads);
                 } else{
+                    toast.error("Не удалось получить настройки пэдов");
                     throw new Error("Не удалось получить настройки для pads_config");
                 }
+
+                const volume = data.volume
+                if (volume){
+                    setVolume(volume);
+                } else{
+                    toast.error("Не удалось получить настройки громкости");
+                    throw new Error("Не удалось получить настройки громкости");
+                }
             } catch (error) {
+                toast.error("Не удалось получить настройки пэдов");
                 console.error("Ошибка загрузки конфигурации пэдов:", error);
             }
         };
@@ -51,12 +61,14 @@ export default function App() {
                 const response = await fetch(`${API_URL}/soundfonts`);
 
                 if (!response.ok){
+                    toast.error("Не удалось получить soundfonts");
                     throw new Error("Не удалось получить soundfonts");
                 }
 
                 let data: string[] = await response.json();
                 setSoundfonts(data);
             } catch (_) {
+                toast.error("Не удалось получить soundfonts");
                 throw new Error("Не удалось получить soundfonts");
                 return;
             }
@@ -74,12 +86,14 @@ export default function App() {
                 const response = await fetch(`${API_URL}/tonalities`);
 
                 if (!response.ok){
+                    toast.error("Не удалось получить тональности");
                     throw new Error("Не удалось получить тональности");
                 }
 
                 let data: string[] = await response.json();
                 setTonalities(data);
             } catch (_) {
+                toast.error("Не удалось получить тональности");
                 throw new Error("Не удалось получить тональности");
                 return;
             }
@@ -92,26 +106,41 @@ export default function App() {
     return localStorage.getItem(STORAGE_CUSTOM_COLOR_KEY) || '#a855f7';
   });
 
-  // Крутилка громкости (0..100)
-  const [volume, setVolume] = useState<number>(() => {
-    const saved = localStorage.getItem(STORAGE_VOLUME_KEY);
-    return saved ? Number(saved) : 85;
-  });
+    // Крутилка громкости (0..100)
+    const [volume, setVolume] = useState<number>(85);
+
+    const volumeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const handleVolumeChange = (value: number) => {
+        setVolume(value);
+
+        // Сбрасываем предыдущий таймер
+        if (volumeTimeout.current !== null) {
+            clearTimeout(volumeTimeout.current);
+        }
+
+        // Отправляем только последнее значение
+        volumeTimeout.current = setTimeout(async () => {
+            try {
+                const response = await fetch(`${API_URL}/volume/${value}`, {
+                    method: "POST",
+                });
+
+                if (!response.ok) {
+                    throw new Error("Не удалось применить громкость пэдов");
+                }
+            } catch (error) {
+                console.error(error);
+                toast.error("Не удалось применить громкость пэдов");
+            }
+        }, 100);
+    };
 
   const [activePadId, setActivePadId] = useState<number | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'pads' | 'soundfonts'>('pads');
   const [selectedPadId, setSelectedPadId] = useState<number>(1);
   const [newSoundfontInput, setNewSoundfontInput] = useState('');
-
-  // Автосохранение
-  useEffect(() => {
-    localStorage.setItem(STORAGE_PADS_KEY, JSON.stringify(pads));
-  }, [pads]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_VOLUME_KEY, volume.toString());
-  }, [volume]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_CUSTOM_COLOR_KEY, customColor);
@@ -134,6 +163,7 @@ export default function App() {
     const deltaY = startYRef.current - e.clientY;
     const newVal = Math.min(100, Math.max(0, Math.round(startValRef.current + deltaY * 0.7)));
     setVolume(newVal);
+    handleVolumeChange(newVal);
   };
 
   const handleKnobPointerUp = (e: React.PointerEvent) => {
@@ -150,7 +180,12 @@ export default function App() {
     } else if (pad.isClean) {
       return;
     } else {
-      setActivePadId(pad.id === activePadId ? null : pad.id);
+        console.log(pad)
+        if (pad.soundfont !== "" && pad.key !== ""){
+            setActivePadId(pad.id === activePadId ? null : pad.id);
+        } else{
+            toast.warning("Выбран пэд без выбранного звука или тональности. Проверьте настройки!")
+        }
     }
   };
 
@@ -167,6 +202,7 @@ export default function App() {
             key: keyName,
             label: keyName,
             soundfont: sf,
+            type: 0,
           };
         }
         return p;
@@ -186,6 +222,7 @@ export default function App() {
             key: '',
             label: 'СТОП',
             soundfont: p.soundfont?.trim() ? p.soundfont : (soundfonts[0] || '.sf2'),
+            type: 0,
           };
         }
         return p;
@@ -204,6 +241,7 @@ export default function App() {
             key: '',
             label: '',
             soundfont: '',
+            type: 0,
           };
         }
         return p;
@@ -221,6 +259,7 @@ export default function App() {
   // Применить саундфонт ко всем пэдам
   const handleApplySoundfontToAll = (sf: string) => {
     setPads(prev => prev.map(p => (p.isStop || p.isClean ? p : { ...p, soundfont: sf })));
+    handleSaveConfig();
   };
 
   // Добавить саундфонт в библиотеку
@@ -237,6 +276,7 @@ export default function App() {
 
     const handleSaveConfig = async (filename: string) => {
         try {
+            console.log(JSON.stringify(pads))
             const response = await fetch(`${API_URL}/config`, {
                 method: "POST",
                 headers: {
@@ -246,14 +286,17 @@ export default function App() {
             });
 
             if (!response.ok) {
-                throw new Error("Не удалось удалить файл");
+                throw new Error("Не удалось сохранить настройки");
+                toast.error("Не удалось сохранить настройки");
             }
 
             await fetchPadsCfg();
             await fetchSoundfonts();
+            toast.success("Конфигурация сохранена");
 
         } catch (error) {
-            console.error("Ошибка удаления SoundFont:", error);
+            console.error("Не удалось сохранить настройки:", error);
+            toast.error("Не удалось сохранить настройки");
         }
     };
 
@@ -266,6 +309,7 @@ export default function App() {
 
             if (!response.ok) {
                 throw new Error("Не удалось удалить файл");
+                toast.error("Не удалось удалить файл");
             }
 
             await fetchPadsCfg();
@@ -294,6 +338,9 @@ export default function App() {
                 });
 
                 if (!response.ok) {
+                    if (response.status == 409){
+                        toast.error("Данный файл уже есть на сервере!")
+                    }
                     throw new Error(`Ошибка загрузки: ${file.name}`);
                 }
             }
@@ -312,6 +359,9 @@ export default function App() {
   const knobAngle = -135 + (volume / 100) * 270;
 
   return (
+  <>
+    <Toaster theme="dark" position="top-left" richColors />
+
     <div className="h-screen w-screen max-h-screen overflow-hidden bg-[#090a0d] text-[#f1f3f7] flex flex-col select-none">
       {/* Лаконичная верхняя строка */}
       <header className="h-11 shrink-0 px-3 sm:px-6 border-b border-[#181a22] bg-[#0d0e14] flex items-center justify-between gap-2">
@@ -333,7 +383,7 @@ export default function App() {
             min="0"
             max="100"
             value={volume}
-            onChange={(e) => setVolume(Number(e.target.value))}
+            onChange={(e) => handleVolumeChange(Number(e.target.value))}
             className="w-14 h-1 bg-[#232636] rounded cursor-pointer"
             style={{ accentColor: customColor }}
           />
@@ -445,7 +495,11 @@ export default function App() {
             <div className="p-3 border-b border-[#202330] bg-[#13151f] flex items-center justify-between gap-2">
               <div className="flex bg-[#0b0c12] p-1 rounded-lg border border-[#202332]">
                 <button
-                  onClick={() => setSettingsTab('pads')}
+                  onClick={() => {
+                      setSettingsTab('pads');
+                      handleSaveConfig();
+                      }
+                  }
                   className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
                     settingsTab === 'pads'
                       ? 'bg-[#252838] text-white shadow-sm'
@@ -455,7 +509,11 @@ export default function App() {
                   Пэды (16)
                 </button>
                 <button
-                  onClick={() => setSettingsTab('soundfonts')}
+                  onClick={() => {
+                      setSettingsTab('soundfonts');
+                      handleSaveConfig();
+                      }
+                  }
                   className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
                     settingsTab === 'soundfonts'
                       ? 'bg-[#252838] text-white shadow-sm'
@@ -604,12 +662,14 @@ export default function App() {
                         </button> 
                       </div>
 
-                      {soundfonts.length > 1 ? (
+                      {soundfonts.length > 0 ? (
                         <select
-                          value={currentPad.soundfont || soundfonts[0] || ''}
+                          value={currentPad.soundfont || ""}
                           onChange={(e) => handleSetPadSoundfont(e.target.value)}
                           className="w-full bg-[#0c0d13] border border-[#242738] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none"
                         >
+                          <option value="">— Не выбран —</option>
+
                           {soundfonts.map((sf) => (
                             <option key={sf} value={sf}>
                               {sf}
@@ -618,7 +678,7 @@ export default function App() {
                         </select>
                       ) : (
                         <span className="text-s text-gray-400 font-mono">
-                          {soundfonts.length === 1 ? soundfonts[0] : "Библиотека soundfont пуста!!!"}
+                          Библиотека soundfont пуста!!!
                         </span>
                       )}
                     </div>
@@ -703,7 +763,6 @@ export default function App() {
                 type="button"
                 onClick={() => {
                     handleSaveConfig()
-                    localStorage.setItem(STORAGE_PADS_KEY, JSON.stringify(pads));
                     localStorage.setItem(STORAGE_CUSTOM_COLOR_KEY, customColor);
                     setIsSettingsOpen(false);
                 }}
@@ -718,5 +777,6 @@ export default function App() {
         </div>
       )}
     </div>
+  </>
   );
 }
