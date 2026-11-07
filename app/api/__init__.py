@@ -6,6 +6,6 @@ from app.api.soundfonts import router as soundfonts_router
 
 main_router = APIRouter()
 
-main_router.include_router(settings_router)
 main_router.include_router(sockets_router)
+main_router.include_router(settings_router)
 main_router.include_router(soundfonts_router)

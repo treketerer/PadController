@@ -195,6 +195,7 @@ export default function App() {
 
         const handleGlobalNewSettings = async (data: any) => {
             toast.warning("Кто-то обновил настройки пэдов, загружаем новые настройки!");
+            setActivePadId(null);
             await fetchPadsCfg();
             await fetchSoundfonts();
         };
@@ -210,13 +211,20 @@ export default function App() {
 
     useEffect(() => {
         const handleSocketError = (data: any) => {
-            toast.error("Ошибка при совершении сетевого действия!" + data.message);
+            toast.error("Ошибка при совершении сетевого действия: " + data.message);
+        };
+
+        const handlePadClickError = (data: any) => {
+            toast.warning(data.message);
+            setActivePadId(null);
         };
 
         socketService.on("error", handleSocketError);
+        socketService.on("pad_click_error", handlePadClickError);
 
         return () => {
             socketService.off("error");
+            socketService.off("pad_click_error");
         };
     }, []);
     
@@ -292,8 +300,6 @@ export default function App() {
             isStop: false,
             key: keyName,
             label: keyName,
-            type: 0,
-            octave: 0,
             soundfont: sf,
           };
         }
@@ -313,10 +319,6 @@ export default function App() {
             isStop: true,
             key: '',
             label: 'СТОП',
-
-            type: 0,
-            octave: 0,
-
             soundfont: p.soundfont?.trim() ? p.soundfont : (soundfonts[0] || '.sf2'),
           };
         }
@@ -325,7 +327,7 @@ export default function App() {
     );
   };
 
-  const  handleSetCleanMode = () => {
+  const handleSetCleanMode = () => {
     setPads(prev =>
       prev.map(p => {
         if (p.id === selectedPadId) {
@@ -335,8 +337,6 @@ export default function App() {
             isStop: false,
             key: '',
             label: '',
-            type: 0,
-            octave: 0,
             soundfont: '',
           };
         }
@@ -393,6 +393,7 @@ export default function App() {
           }
           
           socketService.send("settings_saved", {})
+          setActivePadId(null);
           await fetchPadsCfg();
           await fetchSoundfonts();
           toast.success("Конфигурация сохранена");
@@ -784,15 +785,14 @@ export default function App() {
                           <span className="text-neutral-400 block mb-1">Октава:</span>
                           <input
                             type="number"
-                            min={-10}
+                            min={0}
                             max={10}
                             step={1}
                             value={currentPad.octave}
-                            onChange={(e) => handleSetPadOctave(Math.max(-10, Math.min(10, Number(e.target.value))))}
+                            onChange={(e) => handleSetPadOctave(Math.max(0, Math.min(10, Number(e.target.value))))}
                             className="w-full bg-[#0c0d13] border border-[#242738] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none"
                           />
                         </div>
-
                       </div>
                     )}
                   </div>

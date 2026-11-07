@@ -5,17 +5,16 @@ import os
 from fastapi import UploadFile, HTTPException, status, APIRouter
 from pathlib import Path
 
-from app.config import PADS_CONFIG_PATH
+from app.config import PADS_CONFIG_PATH, SOUNDFONTS_UPLOAD_PATH
 from app.schemas.pads_config import PadConfig
+from app.services.settings import get_pads_config
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-BASE_DIR = Path(__file__).resolve().parent
-UPLOAD_DIR = (BASE_DIR / ".." / ".."/ "media/").resolve()
 # Создаем папку если ее нет
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+SOUNDFONTS_UPLOAD_PATH.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {".sf2", ".sf3", ".dls"}
 
@@ -24,7 +23,7 @@ MAX_FILE_SIZE = 250 * 1024 * 1024
 
 @router.get("/soundfonts")
 async def get_fonts_list():
-    return os.listdir(UPLOAD_DIR)
+    return os.listdir(SOUNDFONTS_UPLOAD_PATH)
 
 @router.post("/soundfonts/", status_code=201)
 async def create_soundfont(file: UploadFile):
@@ -38,7 +37,7 @@ async def create_soundfont(file: UploadFile):
             detail="Передан файл неверного типа"
         )
 
-    file_path = UPLOAD_DIR / filename
+    file_path = SOUNDFONTS_UPLOAD_PATH / filename
     if os.path.isfile(file_path):
         raise HTTPException(
             status_code=409,
@@ -71,7 +70,7 @@ async def create_soundfont(file: UploadFile):
 
 @router.delete("/soundfonts/{filename}", status_code=status.HTTP_200_OK)
 async def delete_soundfont(filename: str):
-    file_path = UPLOAD_DIR/filename
+    file_path = SOUNDFONTS_UPLOAD_PATH/filename
 
     if not file_path.is_file():
         raise HTTPException(
@@ -81,9 +80,7 @@ async def delete_soundfont(filename: str):
 
     try:
         try:
-            pads = [PadConfig.model_validate(item) for item in json.loads(
-                open(PADS_CONFIG_PATH, encoding="utf-8").read()
-            )]
+            pads = get_pads_config().pads
 
             for pad in pads:
                 logger.info(f"{pad.soundfont} {filename} {pad.soundfont == filename}")

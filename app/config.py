@@ -1,6 +1,18 @@
 from pathlib import Path
 
-PADS_CONFIG_PATH = Path('static/data.json').resolve()
+from app.schemas.pads_config import PadConfig
+
+# ПУТЬ ДЛЯ SOUNDFONTS
+BASE_DIR = Path(__file__).resolve().parent
+SOUNDFONTS_UPLOAD_PATH = (BASE_DIR / ".."/ "media/").resolve()
+
+# ПУТЬ К КОНФИГУ
+PADS_CONFIG_PATH = Path('app/static/data.json').resolve()
+
+NOTES_LIST = [
+    'C', 'C#', 'D', 'D#', 'E', 'F', 'F#',
+    'G', 'G#', 'A', 'A#', 'H',
+]
 
 TONALITY_LIST = [
     'C', 'C#', 'D', 'D#', 'E', 'F', 'F#',
@@ -10,15 +22,15 @@ TONALITY_LIST = [
 ]
 
 BASE_PADS_CONFIG = [
-    {
-        "id": i,
-        "label": '',
-        "key": '',
-        "soundfont": '',
-        "type": 0,
-        "octave": 0,
-        "isStop": False,
-        "isClean": True
-    }
+    PadConfig(
+        id=i,
+        label='',
+        key='',
+        soundfont='',
+        type=0,
+        octave=4,
+        isStop=False,
+        isClean=True
+    )
     for i in range(1, 17)
 ]

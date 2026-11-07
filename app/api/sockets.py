@@ -3,14 +3,14 @@ import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from app.services.sockets_service import SocketsService
+from app.services import sockets_actions
+from app.services.audio import audio_service
+from app.services.sockets_service import sockets_service
 from app.state import state
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-sockets_service = SocketsService()
 
 @router.websocket("/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
@@ -35,22 +35,18 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
             logger.info(f"{event} {data}")
 
             if event == "pad_click":
-                active_pad = data.get("active_pad")
-                logger.info(active_pad)
-                if active_pad:
-                    state.active_pad = active_pad
-
                 await sockets_service.send_except_author(
                     user_id, "pad_click", data
                 )
 
+                active_pad = data.get("active_pad")
+                await sockets_actions.pad_click(active_pad)
+
             elif event == "volume_changed":
-                volume = data.get("value")
-                if volume:
-                    state.volume = volume
-                    await sockets_service.send_except_author(
-                        user_id, "volume_changed", data
-                    )
+                await sockets_service.send_except_author(
+                    user_id, "volume_changed", data
+                )
+                await sockets_actions.volume_change(data.get("value"))
 
             elif event == "open_settings":
                 await sockets_service.send_except_author(
