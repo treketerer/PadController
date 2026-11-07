@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from app.services.audio import audio_service
@@ -11,7 +12,7 @@ async def pad_click(active_pad: int | None):
         if active_pad:
             state.active_pad = active_pad
             logger.info(f"Запускаем звучание {active_pad}")
-            await audio_service.play(state.active_pad)
+            asyncio.create_task( audio_service.play(state.active_pad) )
         else:
             channel = audio_service.now_pad_channel()
 
@@ -22,17 +23,29 @@ async def pad_click(active_pad: int | None):
                 return
 
             logger.info(f"Останавливаем звучание канала {channel}")
-            await audio_service.stop(audio_service.now_pad)
+            asyncio.create_task( audio_service.stop(audio_service.now_pad) )
             audio_service.now_pad = None
 
     except Exception as ex:
         logger.warning(ex)
 
 async def volume_change(volume: int):
-    if volume is not None:
-        old_volume = state.volume
-        state.volume = volume
-        channel=audio_service.now_pad_channel()
+    if volume is None:
+        return
 
-        await audio_service.set_volume(old_volume, state.volume, channel, transition_duration=round(audio_service.TRANSITION_TIME/2))
+    old_volume = state.volume
+    state.volume = volume
+
+    channel=audio_service.now_pad_channel()
+    if channel is None:
+        return
+
+    await audio_service.set_volume(
+        old_volume,
+        state.volume,
+        channel,
+        transition_duration= round(
+            audio_service.TRANSITION_TIME/2.5
+        )
+    )
 

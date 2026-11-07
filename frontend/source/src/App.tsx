@@ -541,8 +541,8 @@ export default function App() {
         </div>
 
         {/* 16 плиток (4x4) на весь остаток экрана — ЧИСТЫЙ МАТОВЫЙ СТИЛЬ БЕЗ БЛУМА */}
-        <div className="flex-1 min-h-0 min-w-0 flex items-center justify-center h-full">
-          <div className="grid grid-cols-4 grid-rows-4 gap-1.5 sm:gap-3 w-full h-full max-h-full max-w-4xl p-1.5 sm:p-2 bg-[#0b0c11] border border-[#181a24] rounded-xl">
+        <div className="flex-1 min-h-0 min-w-0 flex items-center justify-center">
+          <div className="grid grid-cols-4 grid-rows-4 gap-1.5 sm:gap-3 w-full h-full min-h-0 min-w-0 max-h-full max-w-4xl p-1.5 sm:p-2 bg-[#0b0c11] border border-[#181a24] rounded-xl">
             {pads.map((pad) => {
               const isActive = activePadId === pad.id;
 
@@ -550,7 +550,7 @@ export default function App() {
                 <button
                   key={pad.id}
                   onClick={() => handlePadPress(pad)}
-                  className="relative h-full w-full flex flex-col justify-between p-1.5 sm:p-3 rounded-lg select-none active:scale-[0.98] text-left transition-colors"
+                  className="relative h-full w-full min-h-0 min-w-0 grid grid-rows-[auto_1fr_auto] items-center p-1.5 sm:p-3 rounded-lg select-none active:scale-[0.98] transition-colors overflow-hidden"
                   style={{
                     backgroundColor: isActive
                       ? pad.isStop
@@ -560,37 +560,49 @@ export default function App() {
                     border: stopPadId === pad.id
                       ? '2px solid #f43f5e'
                       : isActive
-                      ? `2px solid ${pad.isStop ? '#f43f5e' : customColor}`
-                      : '1px solid #1f2230',
+                        ? `2px solid ${pad.isStop ? '#f43f5e' : customColor}`
+                        : '1px solid #1f2230',
                   }}
                 >
                   {/* Номер кнопки */}
                   <span
-                    className="text-[9px] sm:text-[10px] font-mono leading-none"
-                    style={{ color: isActive ? (pad.isStop ? '#fb7185' : customColor) : '#5b6172' }}
+                    className="w-full text-[9px] sm:text-[10px] font-mono leading-none text-left"
+                    style={{
+                      color: isActive
+                        ? pad.isStop
+                          ? '#fb7185'
+                          : customColor
+                        : '#5b6172',
+                    }}
                   >
                     {pad.id}
                   </span>
 
-                  {/* Крупная надпись тональности (аккуратно уменьшена на мобилке) */}
-                  <div className="my-auto text-center w-full">
+                  {/* Центральная надпись */}
+                  <div className="w-full min-h-0 min-w-0 flex items-center justify-center text-center overflow-hidden px-0.5">
                     <span
-                      className={`block font-extrabold leading-none tracking-tight ${
-                        (pad.isStop || pad.isClean)
-                          ? 'text-rose-400 text-base sm:text-2xl md:text-3xl'
+                      className={`block w-full font-extrabold leading-tight tracking-tight break-words ${
+                        pad.isStop || pad.isClean
+                          ? 'text-rose-400 text-xs sm:text-2xl md:text-3xl'
                           : isActive
-                            ? 'text-white text-lg sm:text-2xl md:text-3xl lg:text-4xl'
-                            : 'text-neutral-200 text-lg sm:text-2xl md:text-3xl lg:text-4xl'
+                            ? 'text-white text-sm sm:text-2xl md:text-3xl lg:text-4xl'
+                            : 'text-neutral-200 text-sm sm:text-2xl md:text-3xl lg:text-4xl'
                       }`}
                     >
                       {pad.label}
                     </span>
                   </div>
 
-                  {/* Нижняя надпись саундфонта */}
-                  <div className="w-full truncate text-[8px] sm:text-[10px] font-mono border-t border-white/[0.04] pt-0.5">
+                  {/* Название SoundFont */}
+                  <div className="w-full min-w-0 truncate text-[8px] sm:text-[10px] font-mono border-t border-white/[0.04] pt-0.5 text-left">
                     <span className="text-neutral-500">
-                      {pad.isClean ? '—' : (pad.isStop) ? 'СТОП' : (pad.soundfont ? pad.soundfont.replace('.sf2', '') : '—')}
+                      {pad.isClean
+                        ? '—'
+                        : pad.isStop
+                          ? 'СТОП'
+                          : pad.soundfont
+                            ? pad.soundfont.replace('.sf2', '')
+                            : '—'}
                     </span>
                   </div>
                 </button>
@@ -778,6 +790,11 @@ export default function App() {
                             <option value={1}>Тип 1</option>
                             <option value={2}>Тип 2</option>
                             <option value={3}>Тип 3</option>
+                            <option value={4}>Тип 4</option>
+                            <option value={5}>Тип 5</option>
+                            <option value={6}>Тип 6</option>
+                            <option value={7}>Тип 7</option>
+                            <option value={8}>Тип 8</option>
                           </select>
                         </div>
 
@@ -785,8 +802,8 @@ export default function App() {
                           <span className="text-neutral-400 block mb-1">Октава:</span>
                           <input
                             type="number"
-                            min={0}
-                            max={10}
+                            min={1}
+                            max={9}
                             step={1}
                             value={currentPad.octave}
                             onChange={(e) => handleSetPadOctave(Math.max(0, Math.min(10, Number(e.target.value))))}
