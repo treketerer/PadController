@@ -174,10 +174,18 @@ export default function App() {
 
     useEffect(() => {
         const handleClickPad = (data: any) => {
+            console.log(data)
           const active_pad_id = data.active_pad;
 
           if ((active_pad_id > 0 && active_pad_id < 17) || (active_pad_id === null)){
             setActivePadId(active_pad_id)
+          }
+
+          const click_pad = data.click_pad;
+            console.log(click_pad)
+          if ((click_pad > 0 && click_pad < 17) || (click_pad === null)){
+              const pad = pads[click_pad-1]
+              handlePadPress(pad, false)
           }
         };
         
@@ -795,6 +803,7 @@ export default function App() {
                             <option value={6}>Тип 6</option>
                             <option value={7}>Тип 7</option>
                             <option value={8}>Тип 8</option>
+                            <option value={0}>Для синт .sf2</option>
                           </select>
                         </div>
 

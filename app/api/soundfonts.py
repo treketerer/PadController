@@ -6,7 +6,6 @@ from fastapi import UploadFile, HTTPException, status, APIRouter
 from pathlib import Path
 
 from app.config import PADS_CONFIG_PATH, SOUNDFONTS_UPLOAD_PATH
-from app.schemas.pads_config import PadConfig
 from app.services.settings import get_pads_config
 
 logger = logging.getLogger(__name__)

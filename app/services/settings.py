@@ -3,12 +3,12 @@ import logging
 import os
 from dataclasses import dataclass
 
+from app.services.midi import midi_controller
 from app.schemas.pads_config import PadConfig
 
 from app.config import PADS_CONFIG_PATH, BASE_PADS_CONFIG
 from app.services import sockets_actions
 from app.services.audio import audio_service
-from app.services.sockets_service import sockets_service
 from app.state import state
 
 
@@ -65,10 +65,8 @@ async def save_pads_config(cfg: list[PadConfig]):
 
         state.active_pad = None
         await sockets_actions.pad_click(None)
-        # await sockets_service.send_to_all(
-        #     event="pad_click",
-        #     data={"active_pad": None}
-        # )
+        midi_controller.light_off_all_device_pads()
+
         audio_service.update_soundfonts_list()
 
         return True

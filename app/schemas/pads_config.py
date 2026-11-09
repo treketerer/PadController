@@ -7,7 +7,7 @@ class PadConfig(BaseModel):
     key: str
     soundfont: str
 
-    type: int = Field(default=1, ge=1, le=8)
+    type: int = Field(default=1, ge=0, le=8)
     octave: int = Field(default=4, ge=1, le=9)
 
     isClean: bool

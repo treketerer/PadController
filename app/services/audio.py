@@ -27,7 +27,7 @@ class AudioService:
         self.channels_pool = list(range(1,17))
 
         self.fs = fluidsynth.Synth(
-            gain=0.85,
+            gain=0.65,
             samplerate=44100
         )
 
@@ -167,7 +167,7 @@ class AudioService:
 
         sfid: int = self.soundfonts_list[pad.soundfont]
         bank = 0
-        preset = 88 + pad.type
+        preset = 88 + pad.type if pad.type != 0 else 0
 
         if not self.has_preset(sfid, bank, preset):
             self.channels_pool.insert(0, channel)

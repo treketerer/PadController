@@ -4,9 +4,7 @@ import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.services import sockets_actions
-from app.services.audio import audio_service
 from app.services.sockets_service import sockets_service
-from app.state import state
 
 logger = logging.getLogger(__name__)
 
