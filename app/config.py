@@ -7,7 +7,8 @@ BASE_DIR = Path(__file__).resolve().parent
 SOUNDFONTS_UPLOAD_PATH = (BASE_DIR / ".."/ "media/").resolve()
 
 # ПУТЬ К КОНФИГУ
-PADS_CONFIG_PATH = Path('app/static/data.json').resolve()
+BASE_DIR = Path(__file__).resolve().parent
+PADS_CONFIG_PATH = BASE_DIR / "static" / "data.json"
 
 NOTES_LIST = [
     'C', 'C#', 'D', 'D#', 'E', 'F', 'F#',
