@@ -41,8 +41,6 @@ class MidiController:
         self.input_port = mido.open_input(self.input_port_name)
         self.output_port = mido.open_output(self.output_port_name)
 
-
-
         return True
 
     def midi_listener(self):
@@ -113,18 +111,30 @@ class MidiController:
                 logger.exception(ex)
 
     def light_on_device_pad(self, pad_id):
+        if not self.setting_ports():
+            logger.warning("MPD218 не найден! Проверьте подключение.")
+            return
+
         if self.output_port is not None:
             self.output_port.send(mido.Message(
                 "note_on", channel=0, note=pad_id, velocity=127
             ))
 
     def light_off_device_pad(self, pad_id):
+        if not self.setting_ports():
+            logger.warning("MPD218 не найден! Проверьте подключение.")
+            return
+
         if pad_id is not None:
             self.output_port.send(mido.Message(
                 "note_off", channel=0, note=pad_id, velocity=127
             ))
 
     def light_off_all_device_pads(self):
+        if not self.setting_ports():
+            logger.warning("MPD218 не найден! Проверьте подключение.")
+            return
+
         for pad in range(1, 17):
             self.output_port.send(mido.Message(
                 "note_off", channel=0, note=pad, velocity=127

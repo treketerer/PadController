@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { WS_URL } from "./config";
 
 export type SocketMessage = {
     "event": string,
@@ -22,8 +23,6 @@ class SocketService{
         ) {
             return;
         }
-
-        const WS_URL = import.meta.env.VITE_API_URL.replace(/^http/, "ws");
 
         this.socket = new WebSocket(`${WS_URL}/ws/${this.userId}`);
         

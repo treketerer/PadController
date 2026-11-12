@@ -17,7 +17,6 @@ venv/
 # NODEJS IGNORE
 node_modules/
 build/
-dist/
 coverage/
 .DS_Store
 *.log
@@ -26,3 +25,4 @@ coverage/
 *.sf2
 app/static/data.json
 app/test.py
+/frontend/dist

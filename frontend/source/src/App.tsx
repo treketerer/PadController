@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Settings, X, Upload, Plus, Trash2, Save } from 'lucide-react';
 import { Toaster, toast } from "sonner";
 import { socketService } from "./sockets";
+import { API_URL } from "./config";
 
 export interface PadConfig {
   id: number;
@@ -23,8 +24,6 @@ export interface ControlsConfig{
 }
 
 const STORAGE_CUSTOM_COLOR_KEY = 'ambient_pad_server_custom_color';
-
-const API_URL = import.meta.env.VITE_API_URL;
 
 export default function App() {
 
