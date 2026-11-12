@@ -1,3 +1,4 @@
+import os.path
 from contextlib import asynccontextmanager
 import threading
 
@@ -52,7 +53,9 @@ app.add_middleware(
 
 app.include_router(main_router)
 
-app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="frontend")
+base_url = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+frontend_path = os.path.join(base_url, "frontend", "dist")
+app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
 
 if __name__ == "__main__":
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000)#, reload=True)
